@@ -20,5 +20,6 @@
                       isSystemApp:(BOOL)isSystemApp;
 
 + (NSArray<ApplicationItem *> *)allInstalledApps;
++ (NSString *)dataContainerForBundleId:(NSString *)bundleId;
 
 @end
