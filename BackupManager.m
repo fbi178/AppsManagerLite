@@ -24,7 +24,15 @@
 - (BOOL)backupApp:(ApplicationItem *)item error:(NSError **)error {
     if (!item.dataContainerPath || item.dataContainerPath.length == 0) {
         if (error) *error = [NSError errorWithDomain:@"BackupError" code:-1
-                                            userInfo:@{NSLocalizedDescriptionKey: @"无法获取应用容器路径"}];
+                                            userInfo:@{NSLocalizedDescriptionKey: @"无法获取应用容器路径 (App Store应用可能受限)"}];
+        return NO;
+    }
+    
+    // 检查容器是否可读取
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if (![fm isReadableFileAtPath:item.dataContainerPath]) {
+        if (error) *error = [NSError errorWithDomain:@"BackupError" code:-2
+                                            userInfo:@{NSLocalizedDescriptionKey: @"无权限读取容器 (App Store应用受沙盒保护，仅TrollStore安装的应用可备份)"}];
         return NO;
     }
     
@@ -33,7 +41,6 @@
     NSString *workDir = [NSTemporaryDirectory() stringByAppendingPathComponent:
                          [NSString stringWithFormat:@"bk_%@", backupId]];
     
-    NSFileManager *fm = [NSFileManager defaultManager];
     [fm removeItemAtPath:workDir error:nil];
     [fm createDirectoryAtPath:workDir withIntermediateDirectories:YES attributes:nil error:nil];
     
