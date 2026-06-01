@@ -23,20 +23,18 @@ jobs:
         cd App
         make 2>&1
 
-    - name: Check + List
+    - name: Package TIPA
       run: |
-        echo "=== Staged app ==="
-        find App/.theos -name "*.app" -type d
-        APP=$(find App/.theos -name "*.app" -type d | head -1)
-        echo "=== App contents ==="
-        ls -laR "$APP"
-        echo "=== Binary info ==="
-        file "$APP"/bobomanagerlite 2>/dev/null || true
-        echo "=== Entitlements ==="
-        ldid -e "$APP"/bobomanagerlite 2>/dev/null || echo "no entitlements"
+        APP=$(find App/.theos -name "*.app" -type d -not -path "*/arm64/*" | head -1)
+        echo "Using: $APP"
+        mkdir -p Payload
+        cp -a "$APP" Payload/
+        ls -la Payload/*.app/
+        zip -r bobomanagerlite.tipa Payload
+        ls -la *.tipa
 
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
         name: 啵啵-ManagerLite
-        path: App/.theos/_/**/*.app/**/*
+        path: bobomanagerlite.tipa
