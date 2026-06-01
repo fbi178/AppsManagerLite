@@ -36,7 +36,7 @@
     
     NSArray *bundleDirs = [fm contentsOfDirectoryAtPath:rootPath error:nil];
     for (NSString *bundleId in bundleDirs) {
-        NSString *listPath = [rootPath stringByAppendingPathFormat:@"%@/Backups.plist", bundleId];
+        NSString *listPath = [[rootPath stringByAppendingPathComponent:bundleId] stringByAppendingPathComponent:@"Backups.plist"];
         NSArray *backups = [NSArray arrayWithContentsOfFile:listPath];
         if (backups.count > 0) {
             self.allBackups[bundleId] = backups;
