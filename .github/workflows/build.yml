@@ -9,28 +9,33 @@ jobs:
       with: { path: App }
 
     - name: Install deps
-      run: sudo apt update && sudo apt install -y git curl build-essential fakeroot libz-dev
+      run: sudo apt update -qq && sudo apt install -y -qq git curl build-essential fakeroot libz-dev
 
     - name: Theos
-      run: git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
+      run: git clone --recursive --depth 1 -q https://github.com/theos/theos.git /tmp/theos
 
     - name: SDK
       run: |
-        git clone --depth 1 https://github.com/xybp888/iOS-SDKs.git /tmp/sdk
+        git clone --depth 1 -q https://github.com/xybp888/iOS-SDKs.git /tmp/sdk
         mkdir -p /tmp/theos/sdks
         cp -a /tmp/sdk/iPhoneOS14.5.sdk /tmp/theos/sdks/
 
     - name: Build
       run: |
-        set -x
-        which make
+        set +e
         export THEOS=/tmp/theos
-        ls -la /tmp/theos/
-        ls /tmp/theos/sdks/
+        echo "=== CHECK ==="
+        ls /tmp/theos/makefiles/common.mk 2>&1
+        command -v make
         cd App
-        ls -la
-        pwd
+        echo "=== FILES ==="
+        ls *.m *.h Makefile 2>&1
+        echo "=== MAKE ==="
         make package 2>&1
+        RC=$?
+        echo "EXIT CODE: $RC"
+        ls -la Packages/ 2>/dev/null
+        exit $RC
 
     - name: Upload
       if: success()
