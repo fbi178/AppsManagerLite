@@ -13,33 +13,35 @@ jobs:
       with:
         path: App
 
-    - name: 安装依赖
+    - name: Install deps
       run: |
         sudo apt update
-        sudo apt install -y git curl build-essential fakeroot libz-dev
+        sudo apt install -y git curl build-essential fakeroot libz-dev libplist-dev
 
-    - name: 安装 Theos
+    - name: Setup Theos + SDK
       run: |
-        export THEOS=$HOME/theos
-        git clone --recursive https://github.com/theos/theos.git $THEOS
+        export THEOS=\$HOME/theos
+        git clone --recursive https://github.com/theos/theos.git \$THEOS
+        mkdir -p \$THEOS/sdks
+        cd \$THEOS/sdks
+        curl -L --retry 3 https://github.com/arturgryshyn/apple-sdks/raw/master/iPhoneOS14.5.sdk.tar.xz -o sdk.tar.xz
+        tar -xf sdk.tar.xz
+        ls -la *.sdk/
+        echo "SDK_OK"
 
-    - name: 下载 iOS SDK
+    - name: Build
       run: |
-        export THEOS=$HOME/theos
-        mkdir -p $THEOS/sdks
-        cd $THEOS/sdks
-        # 从 theos sdks 官方源下载
-        curl -L --retry 3 https://github.com/arturgryshyn/apple-sdks/raw/master/iPhoneOS14.5.sdk.tar.xz -o sdk.tar.xz ||         curl -L --retry 3 https://github.com/theos/sdks/raw/master/iPhoneOS16.0.sdk.tar.xz -o sdk.tar.xz
-        tar -xf sdk.tar.xz 2>/dev/null || true
-        ls -la *.sdk 2>/dev/null && echo "SDK ready" || echo "SDK dir: $(ls)"
-
-    - name: 编译
-      run: |
-        export THEOS=$HOME/theos
+        export THEOS=\$HOME/theos
         cd App
-        make package
+        ls -la
+        echo "=== Makefile content ==="
+        cat Makefile
+        echo "=== Building ==="
+        make package 2>&1
+        echo "=== Build exit: \$? ==="
+        ls -la Packages/ 2>/dev/null || echo "No packages"
 
-    - name: 上传产物
+    - name: Upload
       uses: actions/upload-artifact@v4
       with:
         name: 啵啵-ManagerLite
