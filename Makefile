@@ -29,7 +29,7 @@ BoBoManagerLite_PRIVATE_FRAMEWORKS = \
     MobileCoreServices \
     FrontBoardServices
 
-BoBoManagerLite_CFLAGS = -fobjc-arc -Wno-deprecated-declarations
+BoBoManagerLite_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-unguarded-availability-new -Wno-error
 
 include $(THEOS_MAKE_PATH)/application.mk
 
