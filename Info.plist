@@ -12,6 +12,10 @@
 	<string>com.bobo.managerlite</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>CFBundleIconFiles</key>
+	<array>
+		<string>AppIcon60x60</string>
+	</array>
 	<key>CFBundleName</key>
 	<string>啵啵-ManagerLite</string>
 	<key>CFBundlePackageType</key>
