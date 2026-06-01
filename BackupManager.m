@@ -1,5 +1,7 @@
 #import "BackupManager.h"
 #import "ApplicationItem.h"
+#import <spawn.h>
+#import <sys/wait.h>
 #import "BackupFileManager.h"
 #import "IDFVManager.h"
 
@@ -232,6 +234,7 @@
 
 // 运行系统命令（TrollStore 环境可用，使用 posix_spawn）
 static int runShellCmd(const char *cmd) {
+    extern char **environ;
     pid_t pid;
     char *argv[] = {"/bin/sh", "-c", (char *)cmd, NULL};
     int ret = posix_spawn(&pid, "/bin/sh", NULL, NULL, argv, environ);
