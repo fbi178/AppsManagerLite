@@ -1,7 +1,9 @@
 include $(THEOS)/makefiles/common.mk
 
 ARCHS = arm64
-TARGET = iphone:14.5:14.0
+TARGET = iphone:clang:latest:14.0
+
+GO_EASY_ON_ME = 1
 
 APPLICATION_NAME = BoBoManagerLite
 BoBoManagerLite_FILES = \
