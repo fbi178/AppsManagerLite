@@ -21,11 +21,10 @@ jobs:
       run: |
         export THEOS=/tmp/theos
         cd App
-        # Use Xcode SDK directly - no need separate SDK download on macOS
         make package 2>&1
 
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
         name: 啵啵-ManagerLite
-        path: App/Packages/*.tipa
+        path: App/Packages/*.deb
