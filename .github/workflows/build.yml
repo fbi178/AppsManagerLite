@@ -33,10 +33,14 @@ jobs:
         cp "$SRC/LaunchScreen.storyboard" "$DST/" 2>/dev/null || true
         echo -n "APPL????" > "$DST/PkgInfo"
         cp App/Resources/AppIcon60x60@2x.png "$DST/" 2>/dev/null || true
-        echo "=== Entitlements ==="
+        
+        echo "=== Verify binary ==="
+        file "$DST/bobomanagerlite"
         ldid -e "$DST/bobomanagerlite" | head -3
         ls -la "$DST"
-        zip -X -r app.tipa Payload
+        
+        # Use ditto instead of zip (no __MACOSX metadata)
+        ditto -c -k --keepParent Payload app.tipa
         ls -la app.tipa
 
     - name: Upload
