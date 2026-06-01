@@ -7,9 +7,9 @@
 	<key>CFBundleDisplayName</key>
 	<string>啵啵-ManagerLite</string>
 	<key>CFBundleExecutable</key>
-	<string>BoBoManagerLite</string>
+	<string>bobomanagerlite</string>
 	<key>CFBundleIdentifier</key>
-	<string>com.bobo.ManagerLite</string>
+	<string>com.bobo.managerlite</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
