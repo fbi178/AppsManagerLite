@@ -17,27 +17,25 @@ jobs:
     - name: SDK
       run: |
         git clone --depth 1 -q https://github.com/xybp888/iOS-SDKs.git /tmp/sdk
-        mkdir -p /tmp/theos/sdks
         cp -a /tmp/sdk/iPhoneOS14.5.sdk /tmp/theos/sdks/
 
     - name: Build
       run: |
-        set +e
         export THEOS=/tmp/theos
-        echo "=== CHECK ==="
-        ls /tmp/theos/makefiles/common.mk 2>&1
-        command -v make
         cd App
-        echo "=== FILES ==="
-        ls *.m *.h Makefile 2>&1
-        echo "=== MAKE ==="
-        make package 2>&1
-        RC=$?
-        echo "EXIT CODE: $RC"
-        ls -la Packages/ 2>/dev/null
-        exit $RC
+        make package 2>&1 | tee /tmp/make_output.txt
+        exit ${PIPESTATUS[0]}
 
-    - name: Upload
+    - name: Upload logs (even on failure)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-output
+        path: |
+          /tmp/make_output.txt
+          App/Packages/*.tipa
+
+    - name: Upload tipa
       if: success()
       uses: actions/upload-artifact@v4
       with:
