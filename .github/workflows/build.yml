@@ -30,7 +30,12 @@ jobs:
       run: |
         export THEOS=/tmp/theos
         cd App
-        make package 2>&1
+        make package 2>&1 | tee /tmp/build.log
+        echo "EXIT CODE: ${PIPESTATUS[0]}"
+        echo "=== ERROR SUMMARY ==="
+        grep -i error /tmp/build.log || echo "No errors found"
+        echo "=== FILE LIST ==="
+        ls -la
 
     - name: Upload
       uses: actions/upload-artifact@v4
