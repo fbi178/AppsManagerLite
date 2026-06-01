@@ -14,7 +14,7 @@ jobs:
 
     - name: Setup
       run: |
-        brew install ldid 2>/dev/null || true
+        brew install ldid xz 2>/dev/null || true
         git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
 
     - name: Build
@@ -23,16 +23,18 @@ jobs:
         cd App
         make package 2>&1
 
-    - name: Check size
+    - name: Check
       run: |
-        echo "=== Packages ==="
-        ls -la App/Packages/
-        echo "=== Deb contents ==="
-        ar -t App/Packages/*.deb
-        ar -x App/Packages/*.deb data.tar.xz
-        tar -tf data.tar.xz | head -30
-        echo "=== App binary size ==="
-        du -sh .theos/_/*.app/bobomanagerlite 2>/dev/null || du -sh App/.theos/_/*.app/* 2>/dev/null || echo "not found"
+        cd App
+        DEB=$(ls Packages/*.deb | head -1)
+        echo "Deb: $DEB ($(stat -f%%z $DEB) bytes)"
+        ar -x "$DEB" data.tar.lzma
+        echo "=== Contents ==="
+        tar -tf data.tar.lzma | head -40
+        tar -xf data.tar.lzma
+        echo "=== App binary ==="
+        find . -name "bobomanagerlite" -type f -exec ls -la {} \;
+        find . -name "*.app" -type d -exec du -sh {} \;
 
     - name: Upload
       uses: actions/upload-artifact@v4
