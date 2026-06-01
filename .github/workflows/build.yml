@@ -11,23 +11,30 @@ jobs:
     - uses: actions/checkout@v4
       with:
         path: App
+
     - name: Install deps
       run: |
         sudo apt update
         sudo apt install -y git curl build-essential fakeroot libz-dev
-    - name: Setup Theos
+
+    - name: Theos + SDK
       run: |
-        export THEOS=$HOME/theos
-        git clone --recursive https://github.com/theos/theos.git $THEOS
-        mkdir -p $THEOS/sdks
-        cd $THEOS/sdks
-        curl -L --retry 3 https://github.com/theos/sdks/releases/download/iPhoneOS14.5.sdk/iPhoneOS14.5.sdk.tar.xz -o sdk.tar.xz
-        tar -xf sdk.tar.xz
+        cd /tmp
+        git clone --depth 1 https://github.com/theos/theos.git theos
+        cd theos
+        git clone --depth 1 https://github.com/theos/sdks.git sdks
+        ls sdks/*.sdk/ || echo "No SDK dirs"
+        cd /tmp/theos/sdks
+        curl -L -o sdk.tar.xz https://github.com/akemin-dayo/AppDataStats/releases/download/sdks/iPhoneOS14.5.sdk.tar.xz
+        tar -xf sdk.tar.xz 2>/dev/null
+        ls -d *.sdk 2>/dev/null && echo "SDK Ready" || echo "No SDK"
+
     - name: Build
       run: |
-        export THEOS=$HOME/theos
+        export THEOS=/tmp/theos
         cd App
         make package 2>&1
+
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
