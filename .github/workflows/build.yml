@@ -17,30 +17,25 @@ jobs:
         brew install ldid xz 2>/dev/null || true
         git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
 
-    - name: Build + Pack TIPA
+    - name: Build + Pack
       run: |
         export THEOS=/tmp/theos
         cd App
         make package 2>&1
-        # Extract .deb
-        DEB=\$(ls Packages/*.deb | head -1)
-        ar -x "\$DEB" data.tar.lzma
+        cd Packages
+        DEB=$(ls *.deb | head -1)
+        cd ..
+        echo "Deb: $DEB"
+        ar -x "Packages/$DEB" data.tar.lzma
         mkdir -p Payload
         tar -xf data.tar.lzma
-        # Check what we have
-        echo "=== Deb contents ==="
+        echo "=== Deb files ==="
         find Applications -type f
-        echo "=== .app size ==="
-        du -sh Applications/bobomanagerlite.app
-        # Create Payload
         mv Applications/bobomanagerlite.app Payload/
-        # Ensure Info.plist is present
+        echo "=== App contents ==="
         ls -la Payload/bobomanagerlite.app/
-        # Resign for TrollStore
-        ldid -S Payload/bobomanagerlite.app/bobomanagerlite 2>/dev/null || echo "ldid skipped"
-        # Create TIPA
-        zip -r app.tipa Payload
-        mv app.tipa Packages/
+        zip -r Payload.zip Payload
+        mv Payload.zip Packages/app.tipa
         ls -la Packages/
 
     - name: Upload
