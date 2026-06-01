@@ -27,10 +27,20 @@ jobs:
       run: |
         APP=$(find App/.theos -name "*.app" -type d -not -path "*/arm64/*" | head -1)
         echo "Using: $APP"
+        
+        # Create PkgInfo (required by iOS)
+        echo -n "APPL????" > "$APP/PkgInfo"
+        
+        # Resign with entitlements
+        ldid -SEntitlements.plist "$APP/bobomanagerlite"
+        
+        echo "=== Final app contents ==="
+        ls -la "$APP"
+        
+        # Package as .tipa (use -X to exclude macOS metadata)
         mkdir -p Payload
         cp -a "$APP" Payload/
-        ls -la Payload/*.app/
-        zip -r bobomanagerlite.tipa Payload
+        zip -X -r bobomanagerlite.tipa Payload
         ls -la *.tipa
 
     - name: Upload
