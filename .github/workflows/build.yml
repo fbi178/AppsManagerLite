@@ -17,17 +17,14 @@ jobs:
         sudo apt update
         sudo apt install -y git curl build-essential fakeroot libz-dev
 
-    - name: Theos + SDK
+    - name: Theos
       run: |
-        cd /tmp
-        git clone --depth 1 https://github.com/theos/theos.git theos
-        cd theos
-        git clone --depth 1 https://github.com/theos/sdks.git sdks
-        ls sdks/*.sdk/ || echo "No SDK dirs"
-        cd /tmp/theos/sdks
-        curl -L -o sdk.tar.xz https://github.com/akemin-dayo/AppDataStats/releases/download/sdks/iPhoneOS14.5.sdk.tar.xz
-        tar -xf sdk.tar.xz 2>/dev/null
-        ls -d *.sdk 2>/dev/null && echo "SDK Ready" || echo "No SDK"
+        git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
+
+    - name: SDK
+      run: |
+        git clone --depth 1 https://github.com/xybp888/iOS-SDKs.git /tmp/sdkrepo
+        cp -a /tmp/sdkrepo/iPhoneOS14.5.sdk /tmp/theos/sdks/iPhoneOS14.5.sdk
 
     - name: Build
       run: |
