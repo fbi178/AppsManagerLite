@@ -57,7 +57,7 @@
 
 - (void)restoreIDFVFromPath:(NSString *)workDir toContainer:(NSString *)containerPath {
     NSString *srcFile = [workDir stringByAppendingPathComponent:IDFV_FILE];
-    NSString *dstFile = [containerPath stringByAppendingPathFormat:@"/Documents/%@", IDFV_FILE];
+    NSString *dstFile = [[containerPath stringByAppendingPathComponent:@"Documents"] stringByAppendingPathComponent:IDFV_FILE];
     
     NSFileManager *fm = [NSFileManager defaultManager];
     // 确保 Documents 目录存在
@@ -73,7 +73,7 @@
 
 - (void)restoreIDFAFromPath:(NSString *)workDir toContainer:(NSString *)containerPath {
     NSString *srcFile = [workDir stringByAppendingPathComponent:IDFA_FILE];
-    NSString *dstFile = [containerPath stringByAppendingPathFormat:@"/Documents/%@", IDFA_FILE];
+    NSString *dstFile = [[containerPath stringByAppendingPathComponent:@"Documents"] stringByAppendingPathComponent:IDFA_FILE];
     
     NSFileManager *fm = [NSFileManager defaultManager];
     NSString *docDir = [containerPath stringByAppendingPathComponent:@"Documents"];
@@ -92,7 +92,7 @@
     NSString *containerPath = [self dataContainerForBundleId:bundleId];
     if (!containerPath) return nil;
     
-    NSString *filePath = [containerPath stringByAppendingPathFormat:@"/Documents/%@", IDFV_FILE];
+    NSString *filePath = [[containerPath stringByAppendingPathComponent:@"Documents"] stringByAppendingPathComponent:IDFV_FILE];
     return [NSString stringWithContentsOfFile:filePath encoding:NSUTF8StringEncoding error:nil];
 }
 
@@ -100,7 +100,7 @@
     NSString *containerPath = [self dataContainerForBundleId:bundleId];
     if (!containerPath) return nil;
     
-    NSString *filePath = [containerPath stringByAppendingPathFormat:@"/Documents/%@", IDFA_FILE];
+    NSString *filePath = [[containerPath stringByAppendingPathComponent:@"Documents"] stringByAppendingPathComponent:IDFA_FILE];
     return [NSString stringWithContentsOfFile:filePath encoding:NSUTF8StringEncoding error:nil];
 }
 
