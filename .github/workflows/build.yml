@@ -14,32 +14,29 @@ jobs:
 
     - name: Setup
       run: |
-        brew install ldid xz 2>/dev/null || true
+        brew install ldid 2>/dev/null || true
         git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
 
-    - name: Build + Pack
+    - name: Build
       run: |
         export THEOS=/tmp/theos
         cd App
-        make package 2>&1
-        cd Packages
-        DEB=$(ls *.deb | head -1)
-        cd ..
-        echo "Deb: $DEB"
-        ar -x "Packages/$DEB" data.tar.lzma
-        mkdir -p Payload
-        tar -xf data.tar.lzma
-        echo "=== Deb files ==="
-        find Applications -type f
-        mv Applications/bobomanagerlite.app Payload/
+        make 2>&1
+
+    - name: Check + List
+      run: |
+        echo "=== Staged app ==="
+        find App/.theos -name "*.app" -type d
+        APP=$(find App/.theos -name "*.app" -type d | head -1)
         echo "=== App contents ==="
-        ls -la Payload/bobomanagerlite.app/
-        zip -r Payload.zip Payload
-        mv Payload.zip Packages/app.tipa
-        ls -la Packages/
+        ls -laR "$APP"
+        echo "=== Binary info ==="
+        file "$APP"/bobomanagerlite 2>/dev/null || true
+        echo "=== Entitlements ==="
+        ldid -e "$APP"/bobomanagerlite 2>/dev/null || echo "no entitlements"
 
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
         name: 啵啵-ManagerLite
-        path: App/Packages/app.tipa
+        path: App/.theos/_/**/*.app/**/*
