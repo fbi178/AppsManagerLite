@@ -26,8 +26,7 @@ BoBoManagerLite_FRAMEWORKS = \
     CoreGraphics QuartzCore MessageUI AdSupport
 
 BoBoManagerLite_PRIVATE_FRAMEWORKS = \
-    MobileCoreServices \
-    FrontBoardServices
+    MobileCoreServices
 
 BoBoManagerLite_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-unguarded-availability-new -Wno-error
 
