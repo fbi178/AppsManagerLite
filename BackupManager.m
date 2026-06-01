@@ -55,7 +55,8 @@
         int groupIdx = 0;
         for (NSString *groupPath in item.groupContainerPaths) {
             if ([fm fileExistsAtPath:groupPath]) {
-                [self copyPath:groupPath toPath:[workDir stringByAppendingPathFormat:@"AppGroup_%d", groupIdx++]];
+                NSString *groupDir = [workDir stringByAppendingPathComponent:[NSString stringWithFormat:@"AppGroup_%d", groupIdx++]];
+                [self copyPath:groupPath toPath:groupDir];
             }
         }
         
@@ -157,7 +158,7 @@
         
         // 4. 恢复 App Groups
         for (int i = 0; i < item.groupContainerPaths.count; i++) {
-            NSString *groupSrc = [workDir stringByAppendingPathFormat:@"AppGroup_%d", i];
+            NSString *groupSrc = [workDir stringByAppendingPathComponent:[NSString stringWithFormat:@"AppGroup_%d", i]];
             if ([fm fileExistsAtPath:groupSrc]) {
                 [fm removeItemAtPath:item.groupContainerPaths[i] error:nil];
                 [fm copyItemAtPath:groupSrc toPath:item.groupContainerPaths[i] error:nil];
