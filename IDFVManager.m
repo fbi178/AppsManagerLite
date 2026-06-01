@@ -1,4 +1,5 @@
 #import "IDFVManager.h"
+#import "ApplicationItem.h"
 #import <UIKit/UIKit.h>
 #import <AdSupport/AdSupport.h>
 
@@ -89,7 +90,7 @@
 
 + (NSString *)readIDFVForBundleId:(NSString *)bundleId {
     // 从目标 App 的容器中读取 IDFV 备份文件
-    NSString *containerPath = [self dataContainerForBundleId:bundleId];
+    NSString *containerPath = [ApplicationItem dataContainerForBundleId:bundleId];
     if (!containerPath) return nil;
     
     NSString *filePath = [[containerPath stringByAppendingPathComponent:@"Documents"] stringByAppendingPathComponent:IDFV_FILE];
@@ -97,7 +98,7 @@
 }
 
 + (NSString *)readIDFAForBundleId:(NSString *)bundleId {
-    NSString *containerPath = [self dataContainerForBundleId:bundleId];
+    NSString *containerPath = [ApplicationItem dataContainerForBundleId:bundleId];
     if (!containerPath) return nil;
     
     NSString *filePath = [[containerPath stringByAppendingPathComponent:@"Documents"] stringByAppendingPathComponent:IDFA_FILE];
@@ -114,33 +115,6 @@
     if (NSClassFromString(@"ASIdentifierManager")) {
         if ([[ASIdentifierManager sharedManager] isAdvertisingTrackingEnabled]) {
             return [[[ASIdentifierManager sharedManager] advertisingIdentifier] UUIDString];
-        }
-    }
-    return nil;
-}
-
-#pragma mark - 辅助
-
-// Moved to ApplicationItem - use [ApplicationItem dataContainerForBundleId:] instead
-// + (NSString *)dataContainerForBundleId:(NSString *)bundleId {
-    Class MCMContainer = objc_getClass("MCMAppDataContainer");
-    if (MCMContainer) {
-        id container = [MCMContainer performSelector:@selector(containerWithIdentifier:) withObject:bundleId];
-        if (container) {
-            NSURL *url = [container performSelector:@selector(url)];
-            return url.path;
-        }
-    }
-    
-    // 备选: 扫描容器目录
-    NSString *containersDir = @"/var/mobile/Containers/Data/Application";
-    NSFileManager *fm = [NSFileManager defaultManager];
-    NSArray *dirs = [fm contentsOfDirectoryAtPath:containersDir error:nil];
-    for (NSString *dir in dirs) {
-        NSString *metaPath = [NSString stringWithFormat:@"%@/%@/.com.apple.mobile_container_manager.metadata.plist", containersDir, dir];
-        NSDictionary *meta = [NSDictionary dictionaryWithContentsOfFile:metaPath];
-        if ([meta[@"MCMMetadataIdentifier"] isEqualToString:bundleId]) {
-            return [containersDir stringByAppendingPathComponent:dir];
         }
     }
     return nil;
