@@ -1,0 +1,23 @@
+## Theos
+Packages/
+*.deb
+*.ipa
+.theos/
+obj/
+sym/
+
+## Xcode
+*.xcworkspace
+xcuserdata/
+DerivedData/
+
+## IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+## OS
+.DS_Store
+Thumbs.db
