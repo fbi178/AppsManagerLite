@@ -1,21 +1,187 @@
 #import "BackupFileManager.h"
 #import <zlib.h>
-#import <spawn.h>
-#import <sys/wait.h>
-#import <stdlib.h>
 
 #define kBackupRoot @"/var/mobile/Library/BoBoManager"
-
-// 运行系统命令
-static int runCmd(const char *cmd) {
-    pid_t pid;
-    char *argv[] = {"/bin/sh", "-c", (char *)cmd, NULL};
-    extern char **environ;
-    int ret = posix_spawn(&pid, "/bin/sh", NULL, NULL, argv, environ);
-    if (ret == 0) { int status; waitpid(pid, &status, 0); return WEXITSTATUS(status); }
-    return -1;
-}
 #define kBackupListFile @"Backups.plist"
+
+// 简单 ZIP 工具（用 iOS 自带 zlib）
+@interface ZipUtil : NSObject
++ (BOOL)zipContentsOfDirectory:(NSString *)dirPath toFile:(NSString *)zipPath;
++ (BOOL)unzipFile:(NSString *)zipPath toDirectory:(NSString *)dirPath;
+@end
+
+@implementation ZipUtil
+
++ (BOOL)zipContentsOfDirectory:(NSString *)dirPath toFile:(NSString *)zipPath {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSMutableData *zipData = [NSMutableData data];
+    NSMutableArray *entries = [NSMutableArray array];
+    
+    NSDirectoryEnumerator *e = [fm enumeratorAtPath:dirPath];
+    NSString *relPath;
+    while ((relPath = [e nextObject])) {
+        NSString *fullPath = [dirPath stringByAppendingPathComponent:relPath];
+        BOOL isDir = NO;
+        [fm fileExistsAtPath:fullPath isDirectory:&isDir];
+        if (isDir) {
+            relPath = [relPath stringByAppendingString:@"/"];
+        }
+        NSDictionary *attrs = [fm attributesOfItemAtPath:fullPath error:nil];
+        NSData *fileData = isDir ? [NSData data] : [NSData dataWithContentsOfFile:fullPath];
+        
+        // Local file header
+        uint32_t crc = (uint32_t)crc32(0, fileData.bytes, (uInt)fileData.length);
+        NSData *compressed = [self deflateData:fileData];
+        
+        NSMutableData *header = [NSMutableData data];
+        [self writeU32:0x04034b50 toData:header];  // local file header signature
+        [self writeU16:20 toData:header];           // version needed
+        [self writeU16:0 toData:header];            // flags
+        [self writeU16:8 toData:header];            // compression method (deflate)
+        [self writeU16:0 toData:header];            // mod time
+        [self writeU16:0 toData:header];            // mod date
+        [self writeU32:crc toData:header];          // crc32
+        [self writeU32:(uint32_t)compressed.length toData:header]; // compressed size
+        [self writeU32:(uint32_t)fileData.length toData:header];   // uncompressed size
+        NSData *nameData = [relPath dataUsingEncoding:NSUTF8StringEncoding];
+        [self writeU16:(uint16_t)nameData.length toData:header];
+        [self writeU16:0 toData:header]; // extra field length
+        [header appendData:nameData];
+        
+        uint32_t offset = (uint32_t)zipData.length;
+        [entries addObject:@{@"header": header, @"offset": @(offset), @"name": relPath}];
+        [zipData appendData:header];
+        [zipData appendData:compressed];
+    }
+    
+    // Central directory
+    uint32_t cdOffset = (uint32_t)zipData.length;
+    uint32_t cdSize = 0;
+    for (NSDictionary *entry in entries) {
+        NSMutableData *cd = [NSMutableData data];
+        [self writeU32:0x02014b50 toData:cd];
+        [self writeU16:20 toData:cd];
+        [self writeU16:20 toData:cd];
+        [self writeU16:0 toData:cd];
+        [self writeU16:8 toData:cd];
+        [self writeU16:0 toData:cd];
+        [self writeU16:0 toData:cd];
+        NSData *hdr = entry[@"header"];
+        // Copy crc + sizes from local header (bytes 14-29)
+        [cd appendData:[hdr subdataWithRange:NSMakeRange(14, 12)]];
+        NSData *nameData = [entry[@"name"] dataUsingEncoding:NSUTF8StringEncoding];
+        [self writeU16:(uint16_t)nameData.length toData:cd];
+        [self writeU16:0 toData:cd];
+        [self writeU16:0 toData:cd];
+        [self writeU32:[entry[@"offset"] unsignedIntValue] toData:cd];
+        [cd appendData:nameData];
+        [zipData appendData:cd];
+        cdSize += cd.length;
+    }
+    
+    // End of central directory
+    NSMutableData *eocd = [NSMutableData data];
+    [self writeU32:0x06054b50 toData:eocd];
+    [self writeU16:0 toData:eocd];
+    [self writeU16:0 toData:eocd];
+    [self writeU16:(uint16_t)entries.count toData:eocd];
+    [self writeU16:(uint16_t)entries.count toData:eocd];
+    [self writeU32:cdSize toData:eocd];
+    [self writeU32:cdOffset toData:eocd];
+    [self writeU16:0 toData:eocd];
+    [zipData appendData:eocd];
+    
+    return [zipData writeToFile:zipPath atomically:YES];
+}
+
++ (NSData *)deflateData:(NSData *)data {
+    if (data.length == 0) return data;
+    z_stream strm = {0};
+    deflateInit2(&strm, Z_DEFAULT_COMPRESSION, Z_DEFLATED, -15, 8, Z_DEFAULT_STRATEGY);
+    strm.avail_in = (uInt)data.length;
+    strm.next_in = (Bytef *)data.bytes;
+    NSMutableData *out = [NSMutableData dataWithLength:data.length + 64];
+    do {
+        strm.avail_out = (uInt)(out.length - strm.total_out);
+        strm.next_out = out.mutableBytes + strm.total_out;
+        deflate(&strm, Z_FINISH);
+    } while (strm.avail_out == 0);
+    out.length = strm.total_out;
+    deflateEnd(&strm);
+    return out;
+}
+
++ (BOOL)unzipFile:(NSString *)zipPath toDirectory:(NSString *)dirPath {
+    NSData *data = [NSData dataWithContentsOfFile:zipPath];
+    if (!data || data.length < 22) return NO;
+    
+    // Find EOCD
+    const uint8_t *bytes = data.bytes;
+    NSUInteger len = data.length;
+    uint32_t cdOffset = 0, cdSize = 0, totalEntries = 0;
+    for (NSInteger i = len - 22; i >= 0; i--) {
+        if (bytes[i] == 0x50 && bytes[i+1] == 0x4b && bytes[i+2] == 0x05 && bytes[i+3] == 0x06) {
+            cdSize = *(uint32_t *)(bytes + i + 12);
+            cdOffset = *(uint32_t *)(bytes + i + 16);
+            totalEntries = *(uint16_t *)(bytes + i + 10);
+            break;
+        }
+    }
+    
+    [[NSFileManager defaultManager] createDirectoryAtPath:dirPath withIntermediateDirectories:YES attributes:nil error:nil];
+    
+    // Parse central directory
+    uint32_t pos = cdOffset;
+    for (int i = 0; i < totalEntries && pos < len; i++) {
+        if (bytes[pos] != 0x50 || bytes[pos+1] != 0x4b) break;
+        uint16_t nameLen = *(uint16_t *)(bytes + pos + 28);
+        uint32_t localOff = *(uint32_t *)(bytes + pos + 42);
+        uint32_t compSize = *(uint32_t *)(bytes + pos + 20);
+        
+        NSString *name = [[NSString alloc] initWithBytes:bytes+pos+46 length:nameLen encoding:NSUTF8StringEncoding];
+        pos += 46 + nameLen;
+        
+        if (!name || [name hasSuffix:@"/"]) continue; // skip directories
+        
+        // Read local file header
+        uint32_t lp = localOff;
+        uint16_t localNameLen = *(uint16_t *)(bytes + lp + 26);
+        uint16_t localExtraLen = *(uint16_t *)(bytes + lp + 28);
+        uint32_t dataOff = lp + 30 + localNameLen + localExtraLen;
+        
+        NSData *compData = [data subdataWithRange:NSMakeRange(dataOff, compSize)];
+        NSData *decomp = [self inflateData:compData];
+        
+        NSString *outPath = [dirPath stringByAppendingPathComponent:name];
+        [[NSFileManager defaultManager] createDirectoryAtPath:[outPath stringByDeletingLastPathComponent] withIntermediateDirectories:YES attributes:nil error:nil];
+        [decomp writeToFile:outPath atomically:YES];
+    }
+    return YES;
+}
+
++ (NSData *)inflateData:(NSData *)data {
+    if (data.length == 0) return data;
+    z_stream strm = {0};
+    inflateInit2(&strm, -15);
+    strm.avail_in = (uInt)data.length;
+    strm.next_in = (Bytef *)data.bytes;
+    NSMutableData *out = [NSMutableData dataWithLength:data.length * 5];
+    int ret;
+    do {
+        strm.avail_out = (uInt)(out.length - strm.total_out);
+        strm.next_out = out.mutableBytes + strm.total_out;
+        ret = inflate(&strm, Z_NO_FLUSH);
+    } while (ret == Z_OK && strm.avail_out == 0);
+    out.length = strm.total_out;
+    inflateEnd(&strm);
+    return out;
+}
+
++ (void)writeU32:(uint32_t)v toData:(NSMutableData *)d { [d appendBytes:&v length:4]; }
++ (void)writeU16:(uint16_t)v toData:(NSMutableData *)d { [d appendBytes:&v length:2]; }
+
+@end
+
 
 @implementation BackupFileManager
 
@@ -31,110 +197,60 @@ static int runCmd(const char *cmd) {
 
 - (void)ensureDirectories {
     NSFileManager *fm = [NSFileManager defaultManager];
-    NSString *root = [self backupRootPath];
-    if (![fm fileExistsAtPath:root]) {
-        [fm createDirectoryAtPath:root withIntermediateDirectories:YES attributes:nil error:nil];
+    if (![fm fileExistsAtPath:kBackupRoot]) {
+        [fm createDirectoryAtPath:kBackupRoot withIntermediateDirectories:YES attributes:nil error:nil];
     }
 }
 
-- (NSString *)backupRootPath {
-    return kBackupRoot;
-}
+- (NSString *)backupRootPath { return kBackupRoot; }
 
 - (NSString *)backupDirForBundleId:(NSString *)bundleId {
-    NSString *dir = [[self backupRootPath] stringByAppendingPathComponent:bundleId];
-    NSFileManager *fm = [NSFileManager defaultManager];
-    if (![fm fileExistsAtPath:dir]) {
-        [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
-    }
+    NSString *dir = [kBackupRoot stringByAppendingPathComponent:bundleId];
+    [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
     return dir;
 }
 
 - (NSString *)backupFilePathForBundleId:(NSString *)bundleId backupId:(NSString *)backupId {
-    return [[self backupDirForBundleId:bundleId] stringByAppendingPathComponent:
-            [NSString stringWithFormat:@"%@.adbk", backupId]];
+    return [[self backupDirForBundleId:bundleId] stringByAppendingPathComponent:[NSString stringWithFormat:@"%@.adbk", backupId]];
 }
-
-#pragma mark - ZIP 打包 (使用系统 zip 命令)
 
 - (BOOL)createBackupFileAtPath:(NSString *)destPath
                   fromDataPath:(NSString *)dataPath
                  keychainFiles:(NSArray *)keychainFiles
                       metadata:(NSDictionary *)metadata
                          error:(NSError **)error {
-    
     NSFileManager *fm = [NSFileManager defaultManager];
-    NSString *workDir = [NSTemporaryDirectory() stringByAppendingPathComponent:
-                         [NSString stringWithFormat:@"backup_%u", arc4random()]];
-    
-    // 1. 创建工作目录
-    [fm removeItemAtPath:workDir error:nil];
-    [fm createDirectoryAtPath:workDir withIntermediateDirectories:YES attributes:nil error:nil];
-    
-    // 2. 复制数据到工作目录
-    NSString *dataCopy = [workDir stringByAppendingPathComponent:@"AppData"];
-    if ([fm fileExistsAtPath:dataPath]) {
-        [fm copyItemAtPath:dataPath toPath:dataCopy error:nil];
-    }
-    
-    // 3. 保存元数据
-    [metadata writeToFile:[workDir stringByAppendingPathComponent:@"Binfo.plist"] atomically:YES];
-    
-    // 4. 保存钥匙串文件
-    for (NSString *kcFile in keychainFiles) {
-        NSString *dest = [workDir stringByAppendingPathComponent:[kcFile lastPathComponent]];
-        if ([fm fileExistsAtPath:kcFile]) {
-            [fm copyItemAtPath:kcFile toPath:dest error:nil];
+    // 保存元数据到临时目录
+    [metadata writeToFile:[dataPath stringByAppendingPathComponent:@"Binfo.plist"] atomically:YES];
+    // 追加钥匙串文件
+    for (NSString *kc in keychainFiles) {
+        if ([fm fileExistsAtPath:kc]) {
+            [fm copyItemAtPath:kc toPath:[dataPath stringByAppendingPathComponent:[kc lastPathComponent]] error:nil];
         }
     }
-    
-    // 5. 打包为 ZIP
-    NSString *zipCmd = [NSString stringWithFormat:@"/usr/bin/zip -r -q \"%@\" .", destPath];
-    int ret = runCmd([zipCmd UTF8String]);
-    
-    // 6. 清理
-    [fm removeItemAtPath:workDir error:nil];
-    
-    if (ret != 0 && error) {
-        *error = [NSError errorWithDomain:@"BackupError" code:ret userInfo:@{NSLocalizedDescriptionKey: @"打包备份文件失败"}];
-        return NO;
+    // ZIP 打包
+    BOOL ok = [ZipUtil zipContentsOfDirectory:dataPath toFile:destPath];
+    if (!ok && error) {
+        *error = [NSError errorWithDomain:@"BackupError" code:-1 userInfo:@{NSLocalizedDescriptionKey: @"打包失败"}];
     }
-    return YES;
+    return ok;
 }
 
-#pragma mark - ZIP 解包
-
-- (BOOL)extractBackupFileAtPath:(NSString *)backupPath
-                     toTempDir:(NSString *)tempDir
-                         error:(NSError **)error {
-    
-    NSFileManager *fm = [NSFileManager defaultManager];
-    [fm createDirectoryAtPath:tempDir withIntermediateDirectories:YES attributes:nil error:nil];
-    
-    NSString *unzipCmd = [NSString stringWithFormat:@"/usr/bin/unzip -o -q \"%@\" -d \"%@\"", backupPath, tempDir];
-    int ret = runCmd([unzipCmd UTF8String]);
-    
-    if (ret != 0 && error) {
-        *error = [NSError errorWithDomain:@"BackupError" code:ret userInfo:@{NSLocalizedDescriptionKey: @"解压备份文件失败"}];
-        return NO;
+- (BOOL)extractBackupFileAtPath:(NSString *)backupPath toTempDir:(NSString *)tempDir error:(NSError **)error {
+    [[NSFileManager defaultManager] removeItemAtPath:tempDir error:nil];
+    BOOL ok = [ZipUtil unzipFile:backupPath toDirectory:tempDir];
+    if (!ok && error) {
+        *error = [NSError errorWithDomain:@"BackupError" code:-1 userInfo:@{NSLocalizedDescriptionKey: @"解压失败"}];
     }
-    return YES;
-}
-
-#pragma mark - 备份列表管理
-
-- (NSString *)backupListPathForBundleId:(NSString *)bundleId {
-    return [[self backupDirForBundleId:bundleId] stringByAppendingPathComponent:kBackupListFile];
+    return ok;
 }
 
 - (NSArray *)loadBackupListForBundleId:(NSString *)bundleId {
-    NSString *path = [self backupListPathForBundleId:bundleId];
-    return [NSArray arrayWithContentsOfFile:path] ?: @[];
+    return [NSArray arrayWithContentsOfFile:[[self backupDirForBundleId:bundleId] stringByAppendingPathComponent:kBackupListFile]] ?: @[];
 }
 
 - (BOOL)saveBackupList:(NSArray *)list forBundleId:(NSString *)bundleId {
-    NSString *path = [self backupListPathForBundleId:bundleId];
-    return [list writeToFile:path atomically:YES];
+    return [list writeToFile:[[self backupDirForBundleId:bundleId] stringByAppendingPathComponent:kBackupListFile] atomically:YES];
 }
 
 @end
