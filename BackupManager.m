@@ -230,13 +230,25 @@
 
 #pragma mark - 钥匙串 (占位，需要 kcaccess 工具)
 
+// 运行系统命令（TrollStore 环境可用，使用 posix_spawn）
+static int runShellCmd(const char *cmd) {
+    pid_t pid;
+    char *argv[] = {"/bin/sh", "-c", (char *)cmd, NULL};
+    int ret = posix_spawn(&pid, "/bin/sh", NULL, NULL, argv, environ);
+    if (ret == 0) {
+        int status;
+        waitpid(pid, &status, 0);
+        return WEXITSTATUS(status);
+    }
+    return -1;
+}
+
 - (BOOL)backupKeychainForBundleId:(NSString *)bundleId toPath:(NSString *)outputPath {
-    // 实际需要 kcaccess 工具
     NSString *kcPath = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"kcaccess"];
     if ([[NSFileManager defaultManager] fileExistsAtPath:kcPath]) {
         NSString *xmlPath = [outputPath stringByAppendingPathComponent:@"kcaccess.xml"];
         NSString *cmd = [NSString stringWithFormat:@"\"%@\" backup \"%@\" \"%@\"", kcPath, bundleId, xmlPath];
-        system([cmd UTF8String]);
+        runShellCmd([cmd UTF8String]);
     }
     return YES;
 }
@@ -245,7 +257,7 @@
     NSString *kcPath = [NSBundle.mainBundle.bundlePath stringByAppendingPathComponent:@"kcaccess"];
     if ([[NSFileManager defaultManager] fileExistsAtPath:kcPath]) {
         NSString *cmd = [NSString stringWithFormat:@"\"%@\" restore \"%@\" \"%@\"", kcPath, bundleId, backupPath];
-        system([cmd UTF8String]);
+        runShellCmd([cmd UTF8String]);
     }
     return YES;
 }
