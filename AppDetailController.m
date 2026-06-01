@@ -3,13 +3,10 @@
 #import "BackupManager.h"
 #import "IDFVManager.h"
 
-@interface AppDetailController ()
-@property (nonatomic, strong) NSMutableArray *sections;
-@property (nonatomic, strong) BackupManager *backupManager;
-@property (nonatomic, strong) NSArray *backups;
-@end
-
-@implementation AppDetailController
+@implementation AppDetailController {
+    BackupManager *_backupManager;
+    NSArray *_backups;
+}
 
 - (instancetype)initWithAppItem:(ApplicationItem *)item {
     self = [super initWithStyle:UITableViewStyleGrouped];
@@ -22,215 +19,128 @@
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = self.appItem.appName;
+    self.title = self.appItem.appName ?: @"应用详情";
     [self.tableView registerClass:[UITableViewCell class] forCellReuseIdentifier:@"Cell"];
-    [self.tableView registerClass:[UITableViewCell class] forCellReuseIdentifier:@"DetailCell"];
-}
-
-- (void)viewWillAppear:(BOOL)animated {
-    [super viewWillAppear:animated];
-    [self refreshBackups];
-    [self buildSections];
-    [self.tableView reloadData];
-}
-
-- (void)refreshBackups {
-    self.backups = [self.backupManager backupsForApp:self.appItem.bundleId];
-}
-
-- (void)buildSections {
-    self.sections = [NSMutableArray array];
-    
-    // Section 0: App 信息
-    NSArray *infoRows = @[
-        @{@"title": @"名称", @"value": self.appItem.appName},
-        @{@"title": @"Bundle ID", @"value": self.appItem.bundleId},
-        @{@"title": @"版本", @"value": self.appItem.version},
-        @{@"title": @"容器路径", @"value": self.appItem.dataContainerPath ?: @"无"},
-    ];
-    [self.sections addObject:@{@"title": @"应用信息", @"rows": infoRows}];
-    
-    // Section 1: 操作
-    NSArray *actionRows = @[
-        @{@"title": @"备份数据", @"action": @"backup", @"color": @0},
-        @{@"title": @"恢复数据", @"action": @"restore", @"color": @1},
-        @{@"title": @"抹除数据", @"action": @"wipe", @"color": @2},
-    ];
-    [self.sections addObject:@{@"title": @"操作", @"rows": actionRows}];
-    
-    // Section 2: IDFV/IDFA
-    IDFVManager *idfvMgr = [IDFVManager sharedInstance];
-    if (idfvMgr.backupIDFVEnabled && idfvMgr.backupIDFAEnabled) {
-        NSString *idfv = [IDFVManager readIDFVForBundleId:self.appItem.bundleId];
-        NSString *idfa = [IDFVManager readIDFAForBundleId:self.appItem.bundleId];
-        [self.sections addObject:@{@"title": @"设备标识", @"rows": @[
-            @{@"title": @"IDFV", @"value": idfv ?: @"未备份"},
-            @{@"title": @"IDFA", @"value": idfa ?: @"未备份"},
-        ]}];
-    }
-    
-    // Section 3: 备份列表
-    if (self.backups.count > 0) {
-        NSMutableArray *backupRows = [NSMutableArray array];
-        for (NSDictionary *b in self.backups) {
-            [backupRows addObject:@{
-                @"title": b[@"name"] ?: @"未知",
-                @"value": b[@"date"] ?: @"",
-                @"backupFile": b
-            }];
-        }
-        [self.sections addObject:@{@"title": @"已有备份", @"rows": backupRows}];
-    }
+    _backups = [_backupManager backupsForApp:self.appItem.bundleId];
 }
 
 #pragma mark - TableView
 
-- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
-    return self.sections.count;
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView { return 3; }
+
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
+    return @[@"应用信息", @"操作", @"备份列表"][section];
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    return [self.sections[section][@"rows"] count];
-}
-
-- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section {
-    return self.sections[section][@"title"];
+    if (section == 0) return 4;
+    if (section == 1) return 3;
+    return _backups.count;
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    NSDictionary *row = self.sections[indexPath.section][@"rows"][indexPath.row];
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"Cell" forIndexPath:indexPath];
+    cell.textLabel.textColor = [UIColor blackColor];
+    cell.detailTextLabel.text = @"";
+    cell.accessoryType = UITableViewCellAccessoryNone;
+    cell.textLabel.textAlignment = NSTextAlignmentLeft;
     
-    if (row[@"action"]) {
-        UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"Cell" forIndexPath:indexPath];
-        cell.textLabel.text = row[@"title"];
-        cell.textLabel.textAlignment = NSTextAlignmentCenter;
-        NSInteger colorType = [row[@"color"] integerValue];
-        if (colorType == 2) {
-            cell.textLabel.textColor = [UIColor redColor];
-        } else {
-            cell.textLabel.textColor = self.view.tintColor;
-        }
-        cell.accessoryType = UITableViewCellAccessoryNone;
-        return cell;
-    } else {
-        UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"DetailCell" forIndexPath:indexPath];
-        cell.textLabel.text = row[@"title"];
-        cell.textLabel.textColor = [UIColor blackColor];
-        cell.textLabel.textAlignment = NSTextAlignmentLeft;
-        cell.detailTextLabel.text = row[@"value"] ?: @"";
-        cell.accessoryType = row[@"backupFile"] ? UITableViewCellAccessoryDetailButton : UITableViewCellAccessoryNone;
-        return cell;
+    if (indexPath.section == 0) {
+        NSArray *labels = @[@"名称", @"Bundle ID", @"版本", @"容器路径"];
+        NSArray *values = @[
+            self.appItem.appName ?: @"未知",
+            self.appItem.bundleId ?: @"未知",
+            self.appItem.version ?: @"未知",
+            [self.appItem.dataContainerPath length] > 0 ? self.appItem.dataContainerPath : @"无权访问"
+        ];
+        cell.textLabel.text = [NSString stringWithFormat:@"%@: %@", labels[indexPath.row], values[indexPath.row]];
+        cell.textLabel.font = [UIFont systemFontOfSize:12];
+        cell.textLabel.numberOfLines = 0;
     }
+    else if (indexPath.section == 1) {
+        NSArray *actions = @[@"备份数据", @"恢复数据", @"抹除数据"];
+        cell.textLabel.text = actions[indexPath.row];
+        cell.textLabel.textAlignment = NSTextAlignmentCenter;
+        cell.textLabel.textColor = indexPath.row == 2 ? [UIColor redColor] : self.view.tintColor;
+        cell.textLabel.font = [UIFont systemFontOfSize:16];
+    }
+    else {
+        NSDictionary *b = _backups[indexPath.row];
+        cell.textLabel.text = [NSString stringWithFormat:@"%@ - %@", b[@"date"]?:@"", b[@"appName"]?:@""];
+    }
+    return cell;
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
     [tableView deselectRowAtIndexPath:indexPath animated:YES];
-    NSDictionary *row = self.sections[indexPath.section][@"rows"][indexPath.row];
-    NSString *action = row[@"action"];
-    if (!action) return;
-    
-    if ([action isEqualToString:@"backup"]) {
-        [self performBackup];
-    } else if ([action isEqualToString:@"restore"]) {
-        [self performRestore];
-    } else if ([action isEqualToString:@"wipe"]) {
-        [self performWipe];
+    if (indexPath.section == 1) {
+        if (indexPath.row == 0) [self doBackup];
+        else if (indexPath.row == 1) [self doRestore];
+        else [self doWipe];
     }
 }
 
-#pragma mark - 备份/恢复/抹除
+#pragma mark - Actions
 
-- (void)performBackup {
-    [self showProgress:@"正在备份..."];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSError *error = nil;
-        BOOL success = [self.backupManager backupApp:self.appItem error:&error];
+- (void)doBackup {
+    UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"备份中" message:@"请稍候..." preferredStyle:UIAlertControllerStyleAlert];
+    [self presentViewController:ac animated:YES completion:nil];
+    
+    dispatch_async(dispatch_get_global_queue(0, 0), ^{
+        NSError *err = nil;
+        BOOL ok = [_backupManager backupApp:self.appItem error:&err];
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self hideProgress];
-            if (success) {
-                [self showAlert:@"成功" message:@"备份完成"];
-                [self refreshBackups];
-                [self buildSections];
-                [self.tableView reloadData];
-            } else {
-                [self showAlert:@"失败" message:error.localizedDescription ?: @"备份失败"];
-            }
+            [self dismissViewControllerAnimated:YES completion:^{
+                NSString *msg = ok ? @"备份完成" : [NSString stringWithFormat:@"失败: %@", err.localizedDescription ?: @"未知错误"];
+                [self showMsg:ok ? @"成功" : @"失败" msg:msg];
+                if (ok) { _backups = [_backupManager backupsForApp:self.appItem.bundleId]; [self.tableView reloadData]; }
+            }];
         });
     });
 }
 
-- (void)performRestore {
-    if (self.backups.count == 0) {
-        [self showAlert:@"提示" message:@"没有可恢复的备份"];
-        return;
-    }
-    if (self.backups.count == 1) {
-        [self restoreBackup:self.backups[0]];
-        return;
-    }
-    // 多备份选择
+- (void)doRestore {
+    if (_backups.count == 0) { [self showMsg:@"提示" msg:@"没有可恢复的备份"]; return; }
+    if (_backups.count == 1) { [self restoreWithDict:_backups[0]]; return; }
     UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"选择备份" message:nil preferredStyle:UIAlertControllerStyleActionSheet];
-    for (NSDictionary *b in self.backups) {
-        [ac addAction:[UIAlertAction actionWithTitle:b[@"name"] style:UIAlertActionStyleDefault handler:^(UIAlertAction *a) {
-            [self restoreBackup:b];
-        }]];
+    for (NSDictionary *b in _backups) {
+        [ac addAction:[UIAlertAction actionWithTitle:[NSString stringWithFormat:@"%@ - %@", b[@"date"]?:@"", b[@"appName"]?:@""] style:UIAlertActionStyleDefault handler:^(UIAlertAction *a){ [self restoreWithDict:b]; }]];
     }
     [ac addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
     [self presentViewController:ac animated:YES completion:nil];
 }
 
-- (void)restoreBackup:(NSDictionary *)backupInfo {
-    [self showProgress:@"正在恢复..."];
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-        NSError *error = nil;
-        BOOL success = [self.backupManager restoreApp:self.appItem fromBackup:backupInfo error:&error];
+- (void)restoreWithDict:(NSDictionary *)b {
+    UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"恢复中" message:@"请稍候..." preferredStyle:UIAlertControllerStyleAlert];
+    [self presentViewController:ac animated:YES completion:nil];
+    dispatch_async(dispatch_get_global_queue(0, 0), ^{
+        NSError *err = nil;
+        BOOL ok = [_backupManager restoreApp:self.appItem fromBackup:b error:&err];
         dispatch_async(dispatch_get_main_queue(), ^{
-            [self hideProgress];
-            if (success) {
-                [self showAlert:@"成功" message:@"恢复完成"];
-            } else {
-                [self showAlert:@"失败" message:error.localizedDescription ?: @"恢复失败"];
-            }
+            [self dismissViewControllerAnimated:YES completion:^{
+                [self showMsg:ok ? @"成功" : @"失败" msg:ok ? @"恢复完成" : [NSString stringWithFormat:@"%@", err.localizedDescription ?: @"未知错误"]];
+            }];
         });
     });
 }
 
-- (void)performWipe {
-    UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"确认抹除"
-                                                                message:@"此操作将删除该应用的所有数据，不可恢复！"
-                                                         preferredStyle:UIAlertControllerStyleAlert];
+- (void)doWipe {
+    UIAlertController *ac = [UIAlertController alertControllerWithTitle:@"确认" message:@"此操作不可恢复，确定抹除?" preferredStyle:UIAlertControllerStyleAlert];
     [ac addAction:[UIAlertAction actionWithTitle:@"取消" style:UIAlertActionStyleCancel handler:nil]];
-    [ac addAction:[UIAlertAction actionWithTitle:@"确认抹除" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *a) {
-        [self showProgress:@"正在抹除..."];
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            NSError *error = nil;
-            BOOL success = [self.backupManager wipeApp:self.appItem error:&error];
+    [ac addAction:[UIAlertAction actionWithTitle:@"抹除" style:UIAlertActionStyleDestructive handler:^(UIAlertAction *a){
+        dispatch_async(dispatch_get_global_queue(0, 0), ^{
+            NSError *err = nil;
+            BOOL ok = [_backupManager wipeApp:self.appItem error:&err];
             dispatch_async(dispatch_get_main_queue(), ^{
-                [self hideProgress];
-                if (success) {
-                    [self showAlert:@"成功" message:@"数据已抹除"];
-                } else {
-                    [self showAlert:@"失败" message:error.localizedDescription ?: @"抹除失败"];
-                }
+                [self showMsg:ok ? @"完成" : @"失败" msg:ok ? @"已抹除" : err.localizedDescription ?: @"未知错误"];
             });
         });
     }]];
     [self presentViewController:ac animated:YES completion:nil];
 }
 
-#pragma mark - 工具
-
-- (void)showProgress:(NSString *)text {
-    UIAlertController *loading = [UIAlertController alertControllerWithTitle:text message:nil preferredStyle:UIAlertControllerStyleAlert];
-    [self presentViewController:loading animated:YES completion:nil];
-}
-
-- (void)hideProgress {
-    [self dismissViewControllerAnimated:YES completion:nil];
-}
-
-- (void)showAlert:(NSString *)title message:(NSString *)message {
-    UIAlertController *ac = [UIAlertController alertControllerWithTitle:title message:message preferredStyle:UIAlertControllerStyleAlert];
+- (void)showMsg:(NSString *)title msg:(NSString *)msg {
+    UIAlertController *ac = [UIAlertController alertControllerWithTitle:title message:msg preferredStyle:UIAlertControllerStyleAlert];
     [ac addAction:[UIAlertAction actionWithTitle:@"确定" style:UIAlertActionStyleDefault handler:nil]];
     [self presentViewController:ac animated:YES completion:nil];
 }
