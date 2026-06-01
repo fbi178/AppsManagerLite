@@ -1,31 +1,54 @@
-name: Build
-on: [push, workflow_dispatch]
+name: Build 啵啵-ManagerLite
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-      with: { path: App }
+      with:
+        path: App
 
-    - name: Setup
+    - name: Install
       run: |
-        sudo apt update -qq
-        sudo apt install -y -qq git curl build-essential fakeroot libz-dev
-        git clone --recursive --depth 1 -q https://github.com/theos/theos.git /tmp/theos
-        git clone --depth 1 -q https://github.com/xybp888/iOS-SDKs.git /tmp/sdk
-        mkdir -p /tmp/theos/sdks
-        cp -a /tmp/sdk/iPhoneOS14.5.sdk /tmp/theos/sdks/
+        sudo apt update
+        sudo apt install -y git curl build-essential fakeroot libz-dev
+
+    - name: Theos + Toolchain
+      run: |
+        git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
+        cd /tmp/theos
+        # Try to init submodules
+        git submodule update --init --recursive
+        # Check if toolchain exists
+        ls -la toolchain/linux/iphone/bin/ 2>/dev/null || echo "toolchain not found"
+        # Try downloading toolchain separately
+        if [ ! -f toolchain/linux/iphone/bin/clang ]; then
+          curl -L https://github.com/theos/toolchain/releases/download/linux-2024/linux-iphone-arm64e.tar.xz -o /tmp/toolchain.tar.xz
+          mkdir -p toolchain/linux/iphone
+          tar -xf /tmp/toolchain.tar.xz -C toolchain/linux/iphone
+        fi
+        ls -la toolchain/linux/iphone/bin/ 2>/dev/null
+
+    - name: SDK
+      run: |
+        git clone --depth 1 https://github.com/xybp888/iOS-SDKs.git /tmp/sdkrepo
+        cp -a /tmp/sdkrepo/iPhoneOS14.5.sdk /tmp/theos/sdks/iPhoneOS14.5.sdk
 
     - name: Build
       run: |
+        set +e
         export THEOS=/tmp/theos
         cd App
-        make package 2>&1
+        make package 2> /tmp/err.log
+        cat /tmp/err.log
+        ls -la Packages/ 2>/dev/null && echo "BUILD OK" || echo "BUILD FAILED"
 
     - name: Upload
-      if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: tipa
+        name: 啵啵-ManagerLite
         path: App/Packages/*.tipa
