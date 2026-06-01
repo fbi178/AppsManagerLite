@@ -3,20 +3,16 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-
 jobs:
   build:
     runs-on: ubuntu-latest
-    
     steps:
     - uses: actions/checkout@v4
       with:
         path: App
 
     - name: Install deps
-      run: |
-        sudo apt update
-        sudo apt install -y git curl build-essential fakeroot libz-dev libplist-dev
+      run: sudo apt update && sudo apt install -y git curl build-essential fakeroot libz-dev
 
     - name: Setup Theos + SDK
       run: |
@@ -27,19 +23,12 @@ jobs:
         curl -L --retry 3 https://github.com/arturgryshyn/apple-sdks/raw/master/iPhoneOS14.5.sdk.tar.xz -o sdk.tar.xz
         tar -xf sdk.tar.xz
         ls -la *.sdk/
-        echo "SDK_OK"
 
     - name: Build
       run: |
         export THEOS=\$HOME/theos
         cd App
-        ls -la
-        echo "=== Makefile content ==="
-        cat Makefile
-        echo "=== Building ==="
         make package 2>&1
-        echo "=== Build exit: \$? ==="
-        ls -la Packages/ 2>/dev/null || echo "No packages"
 
     - name: Upload
       uses: actions/upload-artifact@v4
