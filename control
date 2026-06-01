@@ -1,0 +1,9 @@
+Package: com.bobo.ManagerLite
+Name: 啵啵-ManagerLite
+Version: 1.0.0
+Architecture: iphoneos-arm64
+Description: 应用数据全量备份恢复工具 - 支持IDFV/IDFA
+Maintainer: bobo
+Author: bobo
+Section: Utilities
+Depends: firmware (>= 14.0)
