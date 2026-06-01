@@ -17,17 +17,11 @@ jobs:
         brew install ldid 2>/dev/null || true
         git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
 
-    - name: SDK
-      run: |
-        mkdir -p /tmp/theos/sdks
-        curl -L -o /tmp/sdk.tar.xz https://github.com/xybp888/iOS-SDKs/releases/download/14.5/iPhoneOS14.5.sdk.tar.xz 2>/dev/null || curl -L -o /tmp/sdk.tar.xz https://github.com/theos/sdks/releases/download/v1.0/iPhoneOS14.5.sdk.tar.xz 2>/dev/null || true
-        tar -xf /tmp/sdk.tar.xz -C /tmp/theos/sdks 2>/dev/null || true
-        ls /tmp/theos/sdks/
-
     - name: Build
       run: |
         export THEOS=/tmp/theos
         cd App
+        # Use Xcode SDK directly - no need separate SDK download on macOS
         make package 2>&1
 
     - name: Upload
