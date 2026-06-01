@@ -14,6 +14,7 @@ jobs:
 
     - name: Setup
       run: |
+        brew install ldid 2>/dev/null || true
         git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
 
     - name: Build
@@ -32,13 +33,9 @@ jobs:
         cp "$SRC/LaunchScreen.storyboard" "$DST/" 2>/dev/null || true
         echo -n "APPL????" > "$DST/PkgInfo"
         cp App/Resources/AppIcon60x60@2x.png "$DST/" 2>/dev/null || true
-        
-        # Use Theos's own ldid for correct signing
         /tmp/theos/bin/ldid -SApp/Entitlements.plist "$DST/bobomanagerlite"
-        
-        echo "=== Signature check ==="
+        echo "=== Check ==="
         /tmp/theos/bin/ldid -e "$DST/bobomanagerlite" | head -3
-        
         ls -la "$DST"
         zip -X -r app.tipa Payload
         ls -la app.tipa
