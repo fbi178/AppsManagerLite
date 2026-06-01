@@ -12,19 +12,22 @@ jobs:
       with:
         path: App
 
-    - name: Setup + Build
+    - name: Setup
       run: |
+        brew install ldid 2>/dev/null || true
         git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
+
+    - name: Build
+      run: |
         export THEOS=/tmp/theos
         cd App
         make 2>&1
 
-    - name: Package TIPA
+    - name: Pack TIPA
       run: |
-        APP=$(find App/.theos -name "*.app" -type d -not -path "*/arm64/*" | head -1)
-        echo "Using: $APP"
+        APP=$(find App/.theos -name "bobomanagerlite.app" -type d -not -path "*/arm64/*" | head -1)
+        echo "App: $APP"
         echo -n "APPL????" > "$APP/PkgInfo"
-        ls -la "$APP"
         mkdir -p Payload
         cp -a "$APP" Payload/
         zip -X -r app.tipa Payload
