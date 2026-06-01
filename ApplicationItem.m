@@ -103,11 +103,13 @@
                 NSString *appName = info[@"CFBundleDisplayName"] ?: info[@"CFBundleName"] ?: name;
                 NSString *version = info[@"CFBundleShortVersionString"] ?: @"";
                 if (bundleId) {
+                    UIImage *icon = [self iconForBundlePath:bundlePath];
+                    NSString *container = [self dataContainerForBundleId:bundleId] ?: @"";
                     ApplicationItem *item = [[ApplicationItem alloc] initWithBundleId:bundleId
                                                                               appName:appName
                                                                               version:version
-                                                                                 icon:nil
-                                                                    dataContainerPath:@""
+                                                                                 icon:icon
+                                                                    dataContainerPath:container
                                                                    groupContainerPaths:@[]
                                                                            isSystemApp:NO];
                     [result addObject:item];
@@ -116,6 +118,17 @@
         }
     }
     return result;
+}
+
++ (UIImage *)iconForBundlePath:(NSString *)bundlePath {
+    NSArray *names = @[@"AppIcon60x60@2x.png", @"AppIcon60x60@3x.png",
+                        @"AppIcon40x40@2x.png", @"AppIcon29x29@2x.png",
+                        @"Icon@2x.png", @"Icon.png", @"icon.png"];
+    for (NSString *name in names) {
+        UIImage *img = [UIImage imageWithContentsOfFile:[bundlePath stringByAppendingPathComponent:name]];
+        if (img) return img;
+    }
+    return [self defaultAppIcon];
 }
 
 + (NSArray<ApplicationItem *> *)allAppsViaMobileInstallation {
