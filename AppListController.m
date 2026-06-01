@@ -9,7 +9,6 @@
     [super viewDidLoad];
     self.title = @"应用";
     self.navigationController.navigationBar.translucent = NO;
-    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemRefresh target:self action:@selector(reloadApps)];
     [self.tableView registerClass:[AppTableViewCell class] forCellReuseIdentifier:@"AppCell"];
     self.tableView.rowHeight = 64;
     self.tableView.tableFooterView = [[UIView alloc] init];
