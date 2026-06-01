@@ -12,13 +12,9 @@ jobs:
       with:
         path: App
 
-    - name: Setup
+    - name: Setup + Build
       run: |
-        brew install ldid 2>/dev/null || true
         git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
-
-    - name: Build
-      run: |
         export THEOS=/tmp/theos
         cd App
         make 2>&1
@@ -27,24 +23,15 @@ jobs:
       run: |
         APP=$(find App/.theos -name "*.app" -type d -not -path "*/arm64/*" | head -1)
         echo "Using: $APP"
-        
-        # Create PkgInfo (required by iOS)
         echo -n "APPL????" > "$APP/PkgInfo"
-        
-        # Resign with entitlements
-        ldid -SEntitlements.plist "$APP/bobomanagerlite"
-        
-        echo "=== Final app contents ==="
         ls -la "$APP"
-        
-        # Package as .tipa (use -X to exclude macOS metadata)
         mkdir -p Payload
         cp -a "$APP" Payload/
-        zip -X -r bobomanagerlite.tipa Payload
+        zip -X -r app.tipa Payload
         ls -la *.tipa
 
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
         name: 啵啵-ManagerLite
-        path: bobomanagerlite.tipa
+        path: app.tipa
