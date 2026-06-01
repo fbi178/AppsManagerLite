@@ -12,38 +12,49 @@ jobs:
       with:
         path: App
 
-    - name: Setup
+    - name: Setup + Build
       run: |
         brew install ldid 2>/dev/null || true
         git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
-
-    - name: Build + Sign + Pack
-      run: |
         export THEOS=/tmp/theos
         cd App
         make 2>&1
-        
-        # Take the staged app
-        SRC=$(find .theos/_ -name "*.app" -type d | head -1)
-        echo "SRC: $SRC"
-        
-        # Check if binary is signed
-        echo "=== ldid check ==="
-        ldid -e "$SRC/bobomanagerlite" 2>&1 | head -5
-        
-        # Create Payload
-        mkdir -p Payload
-        cp -a "$SRC" Payload/
-        
-        # Verify required files
-        APP=Payload/bobomanagerlite.app
-        echo "=== App files ==="
-        for f in Info.plist PkgInfo bobomanagerlite; do
-          [ -f "$APP/$f" ] && echo "✅ $f" || echo "❌ $f MISSING"
-        done
-        
-        ditto -c -k --keepParent Payload app.tipa
-        ls -la app.tipa
+
+    - name: Python Pack
+      run: |
+        python3 -c "
+import zipfile, os, shutil
+
+# Find the .app
+for root, dirs, files in os.walk('App/.theos'):
+    for d in dirs:
+        if d.endswith('.app') and 'arm64' not in root:
+            src = os.path.join(root, d)
+            print(f'Using: {src}')
+            print('Contents:')
+            for f in os.listdir(src):
+                s = os.path.getsize(os.path.join(src, f))
+                print(f'  {f}: {s} bytes')
+            
+            # Copy to Payload
+            dst = 'Payload/' + d
+            shutil.rmtree('Payload', ignore_errors=True)
+            os.makedirs('Payload', exist_ok=True)
+            shutil.copytree(src, dst)
+            
+            # Create ZIP
+            with zipfile.ZipFile('app.tipa', 'w', zipfile.ZIP_DEFLATED) as z:
+                for pr, dr, fr in os.walk('Payload'):
+                    for fn in fr:
+                        fp = os.path.join(pr, fn)
+                        an = fp  # relative path includes Payload/
+                        z.write(fp, an)
+            
+            print(f'TIPA: {os.path.getsize(\"app.tipa\")} bytes')
+            break
+    else:
+        print('No .app found!')
+        " 2>&1
 
     - name: Upload
       uses: actions/upload-artifact@v4
