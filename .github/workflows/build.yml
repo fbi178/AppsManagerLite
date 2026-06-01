@@ -22,14 +22,26 @@ jobs:
         export THEOS=/tmp/theos
         cd App
         make package 2>&1
-        # Convert .deb to .tipa
-        DEB=$(ls Packages/*.deb | head -1)
-        ar -x "$DEB" data.tar.lzma
+        # Extract .deb
+        DEB=\$(ls Packages/*.deb | head -1)
+        ar -x "\$DEB" data.tar.lzma
         mkdir -p Payload
         tar -xf data.tar.lzma
-        mv Applications/*.app Payload/
+        # Check what we have
+        echo "=== Deb contents ==="
+        find Applications -type f
+        echo "=== .app size ==="
+        du -sh Applications/bobomanagerlite.app
+        # Create Payload
+        mv Applications/bobomanagerlite.app Payload/
+        # Ensure Info.plist is present
+        ls -la Payload/bobomanagerlite.app/
+        # Resign for TrollStore
+        ldid -S Payload/bobomanagerlite.app/bobomanagerlite 2>/dev/null || echo "ldid skipped"
+        # Create TIPA
         zip -r app.tipa Payload
         mv app.tipa Packages/
+        ls -la Packages/
 
     - name: Upload
       uses: actions/upload-artifact@v4
