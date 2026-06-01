@@ -121,7 +121,8 @@
 
 #pragma mark - 辅助
 
-+ (NSString *)dataContainerForBundleId:(NSString *)bundleId {
+// Moved to ApplicationItem - use [ApplicationItem dataContainerForBundleId:] instead
+// + (NSString *)dataContainerForBundleId:(NSString *)bundleId {
     Class MCMContainer = objc_getClass("MCMAppDataContainer");
     if (MCMContainer) {
         id container = [MCMContainer performSelector:@selector(containerWithIdentifier:) withObject:bundleId];
