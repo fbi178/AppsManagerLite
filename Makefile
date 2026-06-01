@@ -21,7 +21,7 @@ BoBoManagerLite_FILES = \
 
 BoBoManagerLite_FRAMEWORKS = \
     UIKit Foundation MobileCoreServices Security \
-    CoreGraphics QuartzCore MessageUI
+    CoreGraphics QuartzCore MessageUI AdSupport
 
 BoBoManagerLite_PRIVATE_FRAMEWORKS = \
     MobileCoreServices \
