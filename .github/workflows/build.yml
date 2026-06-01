@@ -8,7 +8,8 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v4
-      with: {path: App}
+      with:
+        path: App
     - run: |
         brew install ldid 2>/dev/null || true
         git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
@@ -21,26 +22,10 @@ jobs:
         mkdir -p Payload/bobomanagerlite.app
         cp -a $APP/* Payload/bobomanagerlite.app/
         echo -n "APPL????" > Payload/bobomanagerlite.app/PkgInfo
-        python3 -c "
-import zipfile,os
-with zipfile.ZipFile('app.tipa','w',zipfile.ZIP_DEFLATED) as z:
-    for r,d,f in os.walk('Payload'):
-        for fn in f:
-            fp=os.path.join(r,fn)
-            z.write(fp,fp)
-# Verify
-with zipfile.ZipFile('app.tipa','r') as z:
-    names=z.namelist()
-    for n in sorted(names):
-        print(n)
-    import plistlib
-    try:
-        info=plistlib.loads(z.read('Payload/bobomanagerlite.app/Info.plist'))
-        exe=info.get('CFBundleExecutable','MISSING')
-        print(f'CFBundleExecutable: {exe}')
-        print(f'Binary exists: {\"Payload/bobomanagerlite.app/\"+str(exe) in names}')
-    except Exception as e:
-        print(f'Error: {e}')
-"
+        cp App/Info.plist Payload/bobomanagerlite.app/
+        python3 -c "import zipfile,os; z=zipfile.ZipFile('app.tipa','w',zipfile.ZIP_DEFLATED); [z.write(os.path.join(r,f),os.path.join(r,f)) for r,d,fs in os.walk('Payload') for f in fs]; z.close()"
+        python3 -c "import zipfile,plistlib; z=zipfile.ZipFile('app.tipa','r'); ns=z.namelist(); print(sorted(ns)); i=plistlib.loads(z.read('Payload/bobomanagerlite.app/Info.plist')); print('CFBundleExecutable:',i.get('CFBundleExecutable')); print('Binary exists:',('Payload/bobomanagerlite.app/'+str(i.get('CFBundleExecutable'))) in ns)"
     - uses: actions/upload-artifact@v4
-      with: {name: 啵啵-ManagerLite, path: app.tipa}
+      with:
+        name: app
+        path: app.tipa
