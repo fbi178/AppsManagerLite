@@ -30,6 +30,8 @@ bobomanagerlite_PRIVATE_FRAMEWORKS = \
 
 bobomanagerlite_CFLAGS = -fobjc-arc -Wno-deprecated-declarations -Wno-unguarded-availability-new -Wno-error
 
+bobomanagerlite_CODESIGN_FLAGS = -Sentitlements.plist
+
 include $(THEOS_MAKE_PATH)/application.mk
 
 after-install::
