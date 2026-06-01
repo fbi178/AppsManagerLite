@@ -23,13 +23,21 @@ jobs:
         cd App
         make 2>&1
 
-    - name: Pack TIPA
+    - name: Repack
       run: |
-        APP=$(find App/.theos -name "bobomanagerlite.app" -type d -not -path "*/arm64/*" | head -1)
-        echo "App: $APP"
-        echo -n "APPL????" > "$APP/PkgInfo"
-        mkdir -p Payload
-        cp -a "$APP" Payload/
+        SRC=App/.theos/obj/debug/bobomanagerlite.app
+        DST=Payload/bobomanagerlite.app
+        mkdir -p "$DST"
+        cp "$SRC/bobomanagerlite" "$DST/"
+        cp "$SRC/Info.plist" "$DST/"
+        cp "$SRC/LaunchScreen.storyboard" "$DST/" 2>/dev/null || true
+        cp "$SRC/PkgInfo" "$DST/" 2>/dev/null || echo -n "APPL????" > "$DST/PkgInfo"
+        cp App/Resources/AppIcon60x60@2x.png "$DST/" 2>/dev/null || true
+        echo "=== Final .app ==="
+        ls -la "$DST"
+        echo "=== Entitlements ==="
+        ldid -e "$DST/bobomanagerlite" | head -5
+        echo "=== Packaging ==="
         zip -X -r app.tipa Payload
         ls -la *.tipa
 
