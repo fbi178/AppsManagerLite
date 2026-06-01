@@ -23,6 +23,17 @@ jobs:
         cd App
         make package 2>&1
 
+    - name: Check size
+      run: |
+        echo "=== Packages ==="
+        ls -la App/Packages/
+        echo "=== Deb contents ==="
+        ar -t App/Packages/*.deb
+        ar -x App/Packages/*.deb data.tar.xz
+        tar -tf data.tar.xz | head -30
+        echo "=== App binary size ==="
+        du -sh .theos/_/*.app/bobomanagerlite 2>/dev/null || du -sh App/.theos/_/*.app/* 2>/dev/null || echo "not found"
+
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
