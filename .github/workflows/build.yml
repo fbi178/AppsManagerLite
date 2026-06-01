@@ -17,27 +17,22 @@ jobs:
         brew install ldid xz 2>/dev/null || true
         git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
 
-    - name: Build
+    - name: Build + Pack TIPA
       run: |
         export THEOS=/tmp/theos
         cd App
         make package 2>&1
-
-    - name: Check
-      run: |
-        cd App
+        # Convert .deb to .tipa
         DEB=$(ls Packages/*.deb | head -1)
-        echo "Deb: $DEB ($(stat -f%%z $DEB) bytes)"
         ar -x "$DEB" data.tar.lzma
-        echo "=== Contents ==="
-        tar -tf data.tar.lzma | head -40
+        mkdir -p Payload
         tar -xf data.tar.lzma
-        echo "=== App binary ==="
-        find . -name "bobomanagerlite" -type f -exec ls -la {} \;
-        find . -name "*.app" -type d -exec du -sh {} \;
+        mv Applications/*.app Payload/
+        zip -r app.tipa Payload
+        mv app.tipa Packages/
 
     - name: Upload
       uses: actions/upload-artifact@v4
       with:
         name: 啵啵-ManagerLite
-        path: App/Packages/*.deb
+        path: App/Packages/app.tipa
