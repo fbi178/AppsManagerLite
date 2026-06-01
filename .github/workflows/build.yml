@@ -17,13 +17,13 @@ jobs:
         brew install ldid 2>/dev/null || true
         git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
 
-    - name: Build
+    - name: Build (no sign)
       run: |
         export THEOS=/tmp/theos
         cd App
         make 2>&1
 
-    - name: Pack TIPA
+    - name: Resign + Pack
       run: |
         SRC=App/.theos/obj/debug/bobomanagerlite.app
         DST=Payload/bobomanagerlite.app
@@ -34,12 +34,18 @@ jobs:
         echo -n "APPL????" > "$DST/PkgInfo"
         cp App/Resources/AppIcon60x60@2x.png "$DST/" 2>/dev/null || true
         
-        echo "=== Verify binary ==="
-        file "$DST/bobomanagerlite"
-        ldid -e "$DST/bobomanagerlite" | head -3
-        ls -la "$DST"
+        # Strip debug symbols
+        strip "$DST/bobomanagerlite" 2>/dev/null || true
         
-        # Use ditto instead of zip (no __MACOSX metadata)
+        # Manual resign with TrollStore-compatible flags
+        ldid -S -M -Ksigner.p12 App/Entitlements.plist "$DST/bobomanagerlite" 2>/dev/null
+        ldid -SApp/Entitlements.plist "$DST/bobomanagerlite" 2>/dev/null
+        
+        echo "=== Binary ==="
+        file "$DST/bobomanagerlite"
+        codesign -dv "$DST/bobomanagerlite" 2>/dev/null || echo "no codesign"
+        ldid -e "$DST/bobomanagerlite" 2>/dev/null | head -3 || echo "no entitlements"
+        
         ditto -c -k --keepParent Payload app.tipa
         ls -la app.tipa
 
