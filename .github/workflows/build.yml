@@ -17,32 +17,33 @@ jobs:
         brew install ldid 2>/dev/null || true
         git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
 
-    - name: Build IPA
+    - name: Build + Sign + Pack
       run: |
         export THEOS=/tmp/theos
         cd App
-        make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootless 2>&1 || true
-        # Find the IPA
-        find . -name "*.ipa" -o -name "*.deb" | head -5
-        ls -la Packages/ 2>/dev/null || ls -la
-
-    - name: Convert to TIPA
-      run: |
-        # If deb was created, extract app and repack as tipa
-        DEB=$(find App -name "*.deb" | head -1)
-        if [ -n "$DEB" ]; then
-          mkdir -p Payload
-          cd App
-          ar -x Packages/*.deb data.tar.lzma 2>/dev/null
-          tar -xf data.tar.lzma 2>/dev/null
-          mv Applications/*.app ../Payload/ 2>/dev/null
-          cd ..
-          ditto -c -k --keepParent Payload app.tipa
-          ls -la app.tipa
-        else
-          echo "No deb found"
-          find . -name "*.app" -type d
-        fi
+        make 2>&1
+        
+        # Take the staged app
+        SRC=$(find .theos/_ -name "*.app" -type d | head -1)
+        echo "SRC: $SRC"
+        
+        # Check if binary is signed
+        echo "=== ldid check ==="
+        ldid -e "$SRC/bobomanagerlite" 2>&1 | head -5
+        
+        # Create Payload
+        mkdir -p Payload
+        cp -a "$SRC" Payload/
+        
+        # Verify required files
+        APP=Payload/bobomanagerlite.app
+        echo "=== App files ==="
+        for f in Info.plist PkgInfo bobomanagerlite; do
+          [ -f "$APP/$f" ] && echo "✅ $f" || echo "❌ $f MISSING"
+        done
+        
+        ditto -c -k --keepParent Payload app.tipa
+        ls -la app.tipa
 
     - name: Upload
       uses: actions/upload-artifact@v4
