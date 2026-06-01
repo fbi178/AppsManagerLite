@@ -30,20 +30,17 @@
 + (NSArray<ApplicationItem *> *)allInstalledApps {
     NSMutableArray *result = [NSMutableArray array];
     
-    // 使用 LSApplicationWorkspace 获取已安装应用列表
-    Class LSAppWorkspace = objc_getClass("LSApplicationWorkspace");
-    if (!LSAppWorkspace) {
-        // 备选方案: 使用 MobileInstallation
-        return [self allAppsViaMobileInstallation];
-    }
-    
-    id workspace = [LSAppWorkspace performSelector:@selector(defaultWorkspace)];
-    NSArray *proxies = [workspace performSelector:@selector(allInstalledApplications)];
-    
-    for (id proxy in proxies) {
-        @autoreleasepool {
-            NSString *bundleId = [proxy performSelector:@selector(applicationIdentifier)];
-            NSString *appName = [proxy performSelector:@selector(localizedName)];
+    @try {
+        // 使用 LSApplicationWorkspace 获取已安装应用列表
+        Class LSAppWorkspace = objc_getClass("LSApplicationWorkspace");
+        if (LSAppWorkspace) {
+            id workspace = [LSAppWorkspace performSelector:@selector(defaultWorkspace)];
+            if (workspace) {
+                NSArray *proxies = [workspace performSelector:@selector(allInstalledApplications)];
+                for (id proxy in proxies) {
+                    @autoreleasepool {
+                        NSString *bundleId = [proxy performSelector:@selector(applicationIdentifier)];
+                        NSString *appName = [proxy performSelector:@selector(localizedName)];
             NSString *version = [proxy performSelector:@selector(bundleVersion)];
             NSString *shortVersion = [proxy performSelector:@selector(shortVersionString)];
             
@@ -68,14 +65,56 @@
                                                            groupContainerPaths:groupPaths
                                                                    isSystemApp:isSystem];
             [result addObject:item];
+                    }
+                }
+            }
         }
+    } @catch (NSException *e) {
+        NSLog(@"LSApplicationWorkspace failed: %@", e.reason);
     }
     
-    // 排序: 按应用名排序
+    // 如果 API 方式没拿到结果，用文件系统扫描
+    if (result.count == 0) {
+        [result addObjectsFromArray:[self allAppsViaFilesystem]];
+    }
+    
     [result sortUsingComparator:^NSComparisonResult(ApplicationItem *a, ApplicationItem *b) {
         return [a.appName localizedCompare:b.appName];
     }];
     
+    return result;
+}
+
+// 文件系统扫描（TrollStore 兼容）
++ (NSArray<ApplicationItem *> *)allAppsViaFilesystem {
+    NSMutableArray *result = [NSMutableArray array];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *appsDir = @"/var/containers/Bundle/Application";
+    NSArray *uuids = [fm contentsOfDirectoryAtPath:appsDir error:nil];
+    for (NSString *uuid in uuids) {
+        NSString *appPath = [appsDir stringByAppendingPathComponent:uuid];
+        NSArray *apps = [fm contentsOfDirectoryAtPath:appPath error:nil];
+        for (NSString *name in apps) {
+            if ([name hasSuffix:@".app"]) {
+                NSString *bundlePath = [appPath stringByAppendingPathComponent:name];
+                NSString *infoPath = [bundlePath stringByAppendingPathComponent:@"Info.plist"];
+                NSDictionary *info = [NSDictionary dictionaryWithContentsOfFile:infoPath];
+                NSString *bundleId = info[@"CFBundleIdentifier"];
+                NSString *appName = info[@"CFBundleDisplayName"] ?: info[@"CFBundleName"] ?: name;
+                NSString *version = info[@"CFBundleShortVersionString"] ?: @"";
+                if (bundleId) {
+                    ApplicationItem *item = [[ApplicationItem alloc] initWithBundleId:bundleId
+                                                                              appName:appName
+                                                                              version:version
+                                                                                 icon:nil
+                                                                    dataContainerPath:@""
+                                                                   groupContainerPaths:@[]
+                                                                           isSystemApp:NO];
+                    [result addObject:item];
+                }
+            }
+        }
+    }
     return result;
 }
 
