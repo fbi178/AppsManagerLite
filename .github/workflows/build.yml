@@ -1,5 +1,8 @@
 name: Build 啵啵-ManagerLite
-on: [push, workflow_dispatch]
+  on:
+    push:
+      branches: [ main ]
+    workflow_dispatch:
 jobs:
   build:
     runs-on: macos-latest
