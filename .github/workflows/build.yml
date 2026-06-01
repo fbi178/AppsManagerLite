@@ -1,46 +1,40 @@
-name: Build 啵啵-ManagerLite
-on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:
+name: Build
+on: [push, workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-      with:
-        path: App
+      with: { path: App }
 
-    - name: Install
-      run: |
-        sudo apt update
-        sudo apt install -y git curl build-essential fakeroot libz-dev
+    - name: Install deps
+      run: sudo apt update && sudo apt install -y git curl build-essential fakeroot libz-dev
 
     - name: Theos
-      run: |
-        git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
+      run: git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
 
     - name: SDK
       run: |
-        git clone --depth 1 https://github.com/xybp888/iOS-SDKs.git /tmp/sdkrepo
-        cp -a /tmp/sdkrepo/iPhoneOS14.5.sdk /tmp/theos/sdks/iPhoneOS14.5.sdk
+        git clone --depth 1 https://github.com/xybp888/iOS-SDKs.git /tmp/sdk
+        mkdir -p /tmp/theos/sdks
+        cp -a /tmp/sdk/iPhoneOS14.5.sdk /tmp/theos/sdks/
 
     - name: Build
       run: |
-        set +e
+        set -x
+        which make
         export THEOS=/tmp/theos
+        ls -la /tmp/theos/
+        ls /tmp/theos/sdks/
         cd App
-        make package 2> /tmp/err.log
-        echo "BUILD_EXIT=$?"
-        ls -la Packages/ 2>/dev/null && echo "HAS_PACKAGES=yes" || echo "HAS_PACKAGES=no"
-        echo "=== ERRORS ==="
-        cat /tmp/err.log
-        [ -f Packages/*.tipa ] && exit 0 || exit 1
+        ls -la
+        pwd
+        make package 2>&1
 
     - name: Upload
       if: success()
       uses: actions/upload-artifact@v4
       with:
-        name: 啵啵-ManagerLite
+        name: tipa
         path: App/Packages/*.tipa
