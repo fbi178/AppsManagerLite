@@ -85,7 +85,7 @@
 
 - (void)updateSearchResultsForSearchController:(UISearchController *)searchController {
     NSString *text = searchController.searchBar.text;
-    if (text.length == 0) {
+    if (!self.apps || text.length == 0) {
         self.filteredApps = nil;
     } else {
         NSPredicate *predicate = [NSPredicate predicateWithFormat:@"appName CONTAINS[cd] %@ OR bundleId CONTAINS[cd] %@", text, text];
