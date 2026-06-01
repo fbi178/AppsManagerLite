@@ -22,6 +22,9 @@
                      toTempDir:(NSString *)tempDir
                          error:(NSError **)error;
 
+// 备份目录
+- (NSString *)backupDirForBundleId:(NSString *)bundleId;
+
 // 备份列表
 - (NSArray *)loadBackupListForBundleId:(NSString *)bundleId;
 - (BOOL)saveBackupList:(NSArray *)list forBundleId:(NSString *)bundleId;
