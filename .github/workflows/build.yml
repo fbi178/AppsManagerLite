@@ -23,15 +23,21 @@ jobs:
         cd App
         make 2>&1
 
-    - name: Pack
+    - name: Pack TIPA
       run: |
-        APP=$(find App/.theos -name bobomanagerlite.app -type d -not -path "*/arm64/*" | head -1)
-        echo "App: $APP"
-        ls -la "$APP"
-        mkdir -p Payload
-        cp -a "$APP" Payload/
-        ditto -c -k --keepParent Payload app.tipa
-        ls -la app.tipa
+        APP=App/.theos/obj/debug/bobomanagerlite.app
+        mkdir -p Payload/bobomanagerlite.app
+        cp -a "$APP/"* Payload/bobomanagerlite.app/
+        echo -n "APPL????" > Payload/bobomanagerlite.app/PkgInfo
+        python3 << 'PYEOF'
+import zipfile, os
+with zipfile.ZipFile('app.tipa', 'w', zipfile.ZIP_DEFLATED) as z:
+    for root, dirs, files in os.walk('Payload'):
+        for fn in files:
+            fp = os.path.join(root, fn)
+            z.write(fp, fp)
+import os; print(f'TIPA: {os.path.getsize("app.tipa")} bytes')
+PYEOF
 
     - name: Upload
       uses: actions/upload-artifact@v4
