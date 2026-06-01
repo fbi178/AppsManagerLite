@@ -1,8 +1,20 @@
 #import "BackupFileManager.h"
 #import <zlib.h>
+#import <spawn.h>
+#import <sys/wait.h>
 #import <stdlib.h>
 
 #define kBackupRoot @"/var/mobile/Library/BoBoManager"
+
+// 运行系统命令
+static int runCmd(const char *cmd) {
+    pid_t pid;
+    char *argv[] = {"/bin/sh", "-c", (char *)cmd, NULL};
+    extern char **environ;
+    int ret = posix_spawn(&pid, "/bin/sh", NULL, NULL, argv, environ);
+    if (ret == 0) { int status; waitpid(pid, &status, 0); return WEXITSTATUS(status); }
+    return -1;
+}
 #define kBackupListFile @"Backups.plist"
 
 @implementation BackupFileManager
@@ -78,7 +90,7 @@
     
     // 5. 打包为 ZIP
     NSString *zipCmd = [NSString stringWithFormat:@"/usr/bin/zip -r -q \"%@\" .", destPath];
-    int ret = system([zipCmd UTF8String]);
+    int ret = runCmd([zipCmd UTF8String]);
     
     // 6. 清理
     [fm removeItemAtPath:workDir error:nil];
@@ -100,7 +112,7 @@
     [fm createDirectoryAtPath:tempDir withIntermediateDirectories:YES attributes:nil error:nil];
     
     NSString *unzipCmd = [NSString stringWithFormat:@"/usr/bin/unzip -o -q \"%@\" -d \"%@\"", backupPath, tempDir];
-    int ret = system([unzipCmd UTF8String]);
+    int ret = runCmd([unzipCmd UTF8String]);
     
     if (ret != 0 && error) {
         *error = [NSError errorWithDomain:@"BackupError" code:ret userInfo:@{NSLocalizedDescriptionKey: @"解压备份文件失败"}];
