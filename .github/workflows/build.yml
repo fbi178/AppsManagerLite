@@ -6,46 +6,29 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
     - uses: actions/checkout@v4
       with:
         path: App
 
-    - name: Install
+    - name: Setup
       run: |
-        sudo apt update
-        sudo apt install -y git curl build-essential fakeroot libz-dev
-
-    - name: Theos + Toolchain
-      run: |
+        brew install ldid 2>/dev/null || true
         git clone --recursive --depth 1 https://github.com/theos/theos.git /tmp/theos
-        cd /tmp/theos
-        # Try to init submodules
-        git submodule update --init --recursive
-        # Check if toolchain exists
-        ls -la toolchain/linux/iphone/bin/ 2>/dev/null || echo "toolchain not found"
-        # Try downloading toolchain separately
-        if [ ! -f toolchain/linux/iphone/bin/clang ]; then
-          curl -L https://github.com/theos/toolchain/releases/download/linux-2024/linux-iphone-arm64e.tar.xz -o /tmp/toolchain.tar.xz
-          mkdir -p toolchain/linux/iphone
-          tar -xf /tmp/toolchain.tar.xz -C toolchain/linux/iphone
-        fi
-        ls -la toolchain/linux/iphone/bin/ 2>/dev/null
 
     - name: SDK
       run: |
-        git clone --depth 1 https://github.com/xybp888/iOS-SDKs.git /tmp/sdkrepo
-        cp -a /tmp/sdkrepo/iPhoneOS14.5.sdk /tmp/theos/sdks/iPhoneOS14.5.sdk
+        mkdir -p /tmp/theos/sdks
+        curl -L -o /tmp/sdk.tar.xz https://github.com/xybp888/iOS-SDKs/releases/download/14.5/iPhoneOS14.5.sdk.tar.xz 2>/dev/null || curl -L -o /tmp/sdk.tar.xz https://github.com/theos/sdks/releases/download/v1.0/iPhoneOS14.5.sdk.tar.xz 2>/dev/null || true
+        tar -xf /tmp/sdk.tar.xz -C /tmp/theos/sdks 2>/dev/null || true
+        ls /tmp/theos/sdks/
 
     - name: Build
       run: |
-        set +e
         export THEOS=/tmp/theos
         cd App
-        make package 2> /tmp/err.log
-        cat /tmp/err.log
-        ls -la Packages/ 2>/dev/null && echo "BUILD OK" || echo "BUILD FAILED"
+        make package 2>&1
 
     - name: Upload
       uses: actions/upload-artifact@v4
