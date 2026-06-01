@@ -1,5 +1,6 @@
 #import "BackupFileManager.h"
 #import <zlib.h>
+#import <stdlib.h>
 
 #define kBackupRoot @"/var/mobile/Library/BoBoManager"
 #define kBackupListFile @"Backups.plist"
